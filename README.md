@@ -47,12 +47,15 @@ Message units that flow through ports:
 
 ```
 vnpu/
+├── CLAUDE.md            # AI development guide
+├── DTECHO.md            # Deep Tree Echo ecosystem integration
 ├── grammar/
 │   └── Vnpu.g4          # ANTLR4 grammar (IDE/tooling)
 ├── src/
 │   └── parser/
 │       ├── vnpu.l       # Lex tokenizer (Plan9/Inferno)
-│       └── vnpu.y       # Yacc parser (Plan9/Inferno)
+│       ├── vnpu.y       # Yacc parser (Plan9/Inferno)
+│       └── Makefile     # Build system
 ├── examples/
 │   └── hello.vnpu       # Example program
 ├── docs/
@@ -102,6 +105,16 @@ The vNPU manifests in Plan9/Inferno as:
 - `/dev/vnpu/*` device files
 - Styx/9P services
 - Isolates as processes/namespaces
+
+## Deep Tree Echo Integration
+
+vNPU supports the Deep Tree Echo (DTEcho) ecosystem for recursive consciousness substrates:
+
+- **Echo Layers** map to vNPU membranes
+- **Branch Nodes** implemented as trans-membrane isolates
+- **Leaf Kernels** execute in inner membranes
+
+See [DTECHO.md](DTECHO.md) for full ecosystem documentation.
 
 ## Related
 

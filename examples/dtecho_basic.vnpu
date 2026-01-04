@@ -1,0 +1,91 @@
+// vNPU Example: Deep Tree Echo - Basic Echo Pattern
+// Demonstrates recursive echo through membrane layers
+vnpu v1;
+
+// Device declarations
+device cpu0 { kind=cpu; threads=8; }
+device gpu0 { kind=cuda; sm=86; }
+
+// Tensor declarations for echo pipeline
+tensor intent_vec   : f32[1,512]  @cpu0;     // Input intent
+tensor branch_state : f32[1,1024] @gpu0;     // Branch node state
+tensor leaf_state   : f32[1,256]  @gpu0;     // Leaf computation state
+tensor evidence_vec : f32[1,512]  @cpu0;     // Output evidence
+
+// Provenance tracking tensor
+tensor provenance : f32[1,4] @cpu0;  // [confidence, depth, echo_count, timestamp]
+
+// DTEcho kernel declarations
+kernel k_encode   = dtecho.encode(intent_vec, provenance) -> branch_state;
+kernel k_branch   = dtecho.branch(branch_state) -> leaf_state;
+kernel k_compute  = dtecho.leaf(leaf_state) -> leaf_state;
+kernel k_echo     = dtecho.echo(leaf_state, provenance) -> branch_state;
+kernel k_decode   = dtecho.decode(branch_state) -> evidence_vec;
+
+// Echo integrity policy
+policy echo_policy {
+  // Inner: pure computation only
+  membrane inner denies toolcall;
+  membrane inner denies external_io;
+
+  // Trans: evidence requires provenance
+  membrane trans allows evidence when provenance >= 0.7;
+  membrane trans allows intent when depth <= 8;
+
+  // Outer: rate limiting
+  membrane outer allows intent when budget.tokens <= 4096;
+  membrane outer allows evidence when echo.complete == true;
+}
+
+// Leaf computation graph (innermost)
+graph g_leaf {
+  k_compute;
+}
+
+// Branch processing graph (trans layer)
+graph g_branch {
+  k_branch;
+  k_echo;
+}
+
+// Coordinator graph (outer layer)
+graph g_coordinator {
+  k_encode;
+  k_decode;
+}
+
+// Leaf isolate - core computation
+isolate leaf_node {
+  membrane=inner;
+  entry g_leaf;
+  ports {
+    task_in: Intent;
+    result_out: Evidence;
+    state: Tensor;
+  }
+}
+
+// Branch isolate - intermediate processing
+isolate branch_node {
+  membrane=trans;
+  entry g_branch;
+  ports {
+    parent_in: Intent;
+    parent_out: Evidence;
+    child_out: Intent;
+    child_in: Evidence;
+    control: Bytes;
+  }
+}
+
+// Coordinator isolate - root context
+isolate echo_coordinator {
+  membrane=outer;
+  entry g_coordinator;
+  ports {
+    intent: Intent;
+    evidence: Evidence;
+    status: Tensor;
+    control: Bytes;
+  }
+}
