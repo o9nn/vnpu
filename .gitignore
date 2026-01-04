@@ -1,0 +1,39 @@
+# Build artifacts
+*.o
+*.a
+*.so
+*.dylib
+
+# Parser generated files
+src/parser/vnpu.tab.c
+src/parser/vnpu.tab.h
+src/parser/lex.yy.c
+src/parser/vnpu_parser
+
+# ANTLR generated files
+grammar/*.tokens
+grammar/*.interp
+grammar/*Lexer.java
+grammar/*Parser.java
+grammar/*Listener.java
+grammar/*Visitor.java
+grammar/*BaseListener.java
+grammar/*BaseVisitor.java
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.env
+venv/

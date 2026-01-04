@@ -1,0 +1,40 @@
+// vNPU Example: Basic neural computation with membrane isolation
+vnpu v1;
+
+// Device declarations
+device cpu0 { kind=cpu; threads=4; }
+device gpu0 { kind=cuda; sm=80; }
+
+// Tensor declarations
+tensor x : f16[1,128,4096] @cpu0;
+tensor w : f16[4096,4096]  @gpu0;
+tensor y : f16[1,128,4096] @gpu0;
+
+// Kernel declarations
+kernel k0 = aten.matmul(x,w) -> y;
+kernel k1 = rwkv.step(y)     -> y;
+
+// Policy enforcement
+policy mem {
+  membrane inner denies toolcall;
+  membrane trans allows evidence when provenance>=0.7 and budget.tokens<=4096;
+  membrane outer allows intent;
+}
+
+// Computation graph
+graph g_main {
+  k0;
+  k1;
+}
+
+// Isolate definition
+isolate core {
+  membrane=inner;
+  entry g_main;
+  ports {
+    input: Intent;
+    output: Evidence;
+    control: Bytes;
+    status: Tensor;
+  }
+}
