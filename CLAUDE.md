@@ -109,9 +109,49 @@ EvidencePacket ← [outer] ← [trans] ← [inner] ← Results
 
 - [x] ANTLR4 grammar complete (grammar/Vnpu.g4)
 - [x] Lex/Yacc parser scaffolding (src/parser/)
-- [ ] AST data structures (TODO in vnpu.y:14)
+- [x] AST data structures (implemented in vnpu.y:14-125)
+- [x] Parser actions for AST construction (all grammar rules build AST)
+- [x] AST pretty-printer for debugging (print_ast function)
 - [ ] Semantic analysis
 - [ ] Code generation
+
+### Recent Changes
+
+**AST Construction Phase (completed)**
+- Enhanced AST node structure with support for all vNPU constructs
+- Implemented semantic actions in parser to build AST during parsing
+- Added comprehensive AST pretty-printer showing:
+  - Device declarations with properties
+  - Tensor declarations with shapes and locations
+  - Kernel declarations with qualified calls
+  - Policy statements with complex conditions
+  - Graph and isolate definitions
+- Parser successfully builds and prints AST for complete vNPU programs
+
+### Parser Example Output
+
+```bash
+cd src/parser && make test
+```
+
+Output shows structured AST:
+```
+PROGRAM
+  Device 'cpu0' { kind=cpu, threads=4 }
+  Tensor 'x' : f16[1,128,4096] @cpu0
+  Kernel 'k0' = aten.matmul(x, w) -> y
+  Policy 'mem'
+    membrane inner denies toolcall
+    membrane trans allows evidence when (provenance>=0.7 and budget.tokens<=4096)
+  Graph 'g_main' { k0; k1; }
+  Isolate 'core'
+    membrane = inner
+    entry g_main
+    ports {
+      port input: Intent
+      port output: Evidence
+    }
+```
 
 ### Adding New Language Features
 
