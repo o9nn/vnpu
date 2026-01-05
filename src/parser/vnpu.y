@@ -1,6 +1,6 @@
 /**
  * vNPU Parser - Yacc/Bison
- * 
+ *
  * Minimal parser for Plan9/Inferno C toolchain.
  */
 %{
@@ -11,7 +11,37 @@
 void yyerror(const char *s);
 int yylex(void);
 
-/* TODO: build AST structs here */
+/* AST Node Types */
+typedef enum {
+    AST_PROGRAM,
+    AST_DEVICE,
+    AST_TENSOR,
+    AST_KERNEL,
+    AST_GRAPH,
+    AST_ISOLATE,
+    AST_POLICY,
+    AST_MEMBRANE,
+    AST_PORT,
+    AST_EXPR
+} AstNodeType;
+
+typedef struct AstNode {
+    AstNodeType type;
+    char *name;
+    struct AstNode *left;
+    struct AstNode *right;
+    struct AstNode *next;  /* for lists */
+} AstNode;
+
+AstNode *ast_root = NULL;
+
+AstNode *make_node(AstNodeType type, const char *name) {
+    AstNode *n = (AstNode *)malloc(sizeof(AstNode));
+    n->type = type;
+    n->name = name ? strdup(name) : NULL;
+    n->left = n->right = n->next = NULL;
+    return n;
+}
 %}
 
 %union {
@@ -28,6 +58,10 @@ int yylex(void);
 %token <s> ID DTYPE STRING COP
 %token <i> INT BOOL
 %token <f> FLOAT
+
+/* Precedence for expression operators (lowest to highest) */
+%left OR
+%left AND
 
 %%
 
