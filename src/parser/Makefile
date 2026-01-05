@@ -11,7 +11,7 @@ TARGET = vnpu_parser
 all: $(TARGET)
 
 $(TARGET): vnpu.tab.c lex.yy.c
-	$(CC) $(CFLAGS) -o $@ vnpu.tab.c lex.yy.c -lfl
+	$(CC) $(CFLAGS) -o $@ vnpu.tab.c lex.yy.c 
 
 vnpu.tab.c vnpu.tab.h: vnpu.y
 	$(YACC) -d vnpu.y
