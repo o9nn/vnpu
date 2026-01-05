@@ -80,37 +80,226 @@ void append_node(AstNode *list, AstNode *item) {
     curr->next = item;
 }
 
-void print_ast(AstNode *n, int indent) {
+void print_ast_helper(AstNode *n, int indent, const char *label) {
     if (!n) return;
     for (int i = 0; i < indent; i++) printf("  ");
     
     switch (n->type) {
-        case AST_PROGRAM: printf("PROGRAM\n"); break;
-        case AST_DEVICE: printf("DEVICE: %s\n", n->name); break;
-        case AST_TENSOR: printf("TENSOR: %s\n", n->name); break;
-        case AST_KERNEL: printf("KERNEL: %s\n", n->name); break;
-        case AST_GRAPH: printf("GRAPH: %s\n", n->name); break;
-        case AST_ISOLATE: printf("ISOLATE: %s\n", n->name); break;
-        case AST_POLICY: printf("POLICY: %s\n", n->name); break;
-        case AST_POLICY_STMT: printf("POLICY_STMT\n"); break;
-        case AST_MEMBRANE: printf("MEMBRANE: %s\n", n->name); break;
-        case AST_PORT: printf("PORT: %s\n", n->name); break;
-        case AST_EXPR: printf("EXPR: %s\n", n->value ? n->value : ""); break;
+        case AST_PROGRAM: 
+            printf("PROGRAM\n");
+            if (n->child) print_ast_helper(n->child, indent + 1, NULL);
+            return;
+        case AST_DEVICE: 
+            printf("Device '%s'", n->name ? n->name : "?");
+            if (n->child) {
+                printf(" {");
+                AstNode *prop = n->child;
+                while (prop) {
+                    printf(" %s=", prop->name ? prop->name : "?");
+                    if (prop->child && prop->child->type == AST_LITERAL) {
+                        if (prop->child->value) printf("%s", prop->child->value);
+                        else if (prop->child->fval != 0.0) printf("%g", prop->child->fval);
+                        else printf("%d", prop->child->ival);
+                    } else if (prop->child && prop->child->name) {
+                        printf("%s", prop->child->name);
+                    }
+                    prop = prop->next;
+                    if (prop) printf(",");
+                }
+                printf(" }");
+            }
+            printf("\n");
+            if (n->next) print_ast_helper(n->next, indent, NULL);
+            return;
+        case AST_TENSOR: 
+            printf("Tensor '%s' : %s[", n->name ? n->name : "?", n->value ? n->value : "?");
+            if (n->left) {
+                AstNode *dim = n->left;
+                while (dim) {
+                    if (dim->type == AST_LITERAL) printf("%d", dim->ival);
+                    else if (dim->name) printf("%s", dim->name);
+                    dim = dim->next;
+                    if (dim) printf(",");
+                }
+            }
+            printf("]");
+            if (n->right && n->right->name) printf(" @%s", n->right->name);
+            printf("\n");
+            if (n->next) print_ast_helper(n->next, indent, NULL);
+            return;
+        case AST_KERNEL: 
+            printf("Kernel '%s'", n->name ? n->name : "?");
+            if (n->left && n->left->type == AST_CALL) {
+                printf(" = ");
+                // Print qualified name
+                if (n->left->left) {
+                    AstNode *qn = n->left->left;
+                    if (qn->left && qn->left->name) printf("%s", qn->left->name);
+                    if (qn->right && qn->right->name) printf(".%s", qn->right->name);
+                    // Print additional parts
+                    if (qn->next) {
+                        AstNode *p = qn->next;
+                        while (p) {
+                            if (p->name) printf(".%s", p->name);
+                            p = p->next;
+                        }
+                    }
+                }
+                printf("(");
+                // Print arguments
+                if (n->left->right) {
+                    AstNode *arg = n->left->right;
+                    while (arg) {
+                        if (arg->name) printf("%s", arg->name);
+                        else if (arg->type == AST_LITERAL) {
+                            if (arg->value) printf("%s", arg->value);
+                            else printf("%d", arg->ival);
+                        }
+                        arg = arg->next;
+                        if (arg) printf(", ");
+                    }
+                }
+                printf(")");
+            }
+            if (n->right && n->right->name) printf(" -> %s", n->right->name);
+            printf("\n");
+            if (n->next) print_ast_helper(n->next, indent, NULL);
+            return;
+        case AST_GRAPH: 
+            printf("Graph '%s' {", n->name ? n->name : "?");
+            if (n->child) {
+                AstNode *stmt = n->child;
+                while (stmt) {
+                    printf(" %s;", stmt->name ? stmt->name : "?");
+                    stmt = stmt->next;
+                }
+            }
+            printf(" }\n");
+            if (n->next) print_ast_helper(n->next, indent, NULL);
+            return;
+        case AST_ISOLATE: 
+            printf("Isolate '%s'\n", n->name ? n->name : "?");
+            if (n->child) print_ast_helper(n->child, indent + 1, NULL);
+            if (n->next) print_ast_helper(n->next, indent, NULL);
+            return;
+        case AST_POLICY: 
+            printf("Policy '%s'\n", n->name ? n->name : "?");
+            if (n->child) print_ast_helper(n->child, indent + 1, NULL);
+            if (n->next) print_ast_helper(n->next, indent, NULL);
+            return;
+        case AST_POLICY_STMT: 
+            printf("membrane ");
+            if (n->left && n->left->name) printf("%s ", n->left->name);
+            if (n->right) {
+                if (n->right->value) printf("%s ", n->right->value);
+                else if (n->right->name) printf("%s ", n->right->name);
+            }
+            if (n->child && n->child->name) printf("%s", n->child->name);
+            if (n->child && n->child->next) {
+                printf(" when ");
+                print_expr(n->child->next);
+            }
+            printf("\n");
+            if (n->next) print_ast_helper(n->next, indent, NULL);
+            return;
+        case AST_MEMBRANE: 
+            if (n->child && n->child->name) 
+                printf("membrane = %s\n", n->child->name);
+            else 
+                printf("membrane\n");
+            if (n->next) print_ast_helper(n->next, indent, NULL);
+            return;
+        case AST_PORT: 
+            printf("port %s: ", n->name ? n->name : "?");
+            if (n->child && n->child->name) printf("%s", n->child->name);
+            printf("\n");
+            if (n->next) print_ast_helper(n->next, indent, NULL);
+            return;
+        case AST_EXPR: 
+            if (n->name && strcmp(n->name, "entry") == 0) {
+                printf("entry ");
+                if (n->child && n->child->name) printf("%s", n->child->name);
+                printf("\n");
+                if (n->next) print_ast_helper(n->next, indent, NULL);
+                return;
+            }
+            // Generic expression - should not appear at top level
+            if (n->next) print_ast_helper(n->next, indent, NULL);
+            return;
         case AST_LITERAL: 
             if (n->value) printf("LITERAL: %s\n", n->value);
-            else if (n->fval != 0.0) printf("LITERAL: %f\n", n->fval);
+            else if (n->fval != 0.0) printf("LITERAL: %g\n", n->fval);
             else printf("LITERAL: %d\n", n->ival);
             break;
-        case AST_CALL: printf("CALL: %s\n", n->name); break;
-        case AST_LIST: printf("LIST\n"); break;
-        case AST_PROP: printf("PROP: %s = %s\n", n->name, n->value); break;
-        default: printf("UNKNOWN\n"); break;
+        case AST_CALL: 
+            printf("CALL\n"); 
+            break;
+        case AST_LIST: 
+            printf("ports {\n");
+            if (n->child) print_ast_helper(n->child, indent + 1, NULL);
+            for (int i = 0; i < indent; i++) printf("  ");
+            printf("}\n");
+            if (n->next) print_ast_helper(n->next, indent, NULL);
+            return;
+        case AST_PROP: 
+            printf("PROP: %s = %s\n", n->name, n->value); 
+            break;
+        default: 
+            printf("UNKNOWN\n"); 
+            break;
     }
     
-    if (n->child) print_ast(n->child, indent + 1);
-    if (n->left) print_ast(n->left, indent + 1);
-    if (n->right) print_ast(n->right, indent + 1);
-    if (n->next) print_ast(n->next, indent);
+    if (n->next) print_ast_helper(n->next, indent, NULL);
+}
+
+void print_expr(AstNode *n) {
+    if (!n) {
+        printf("<null>");
+        return;
+    }
+    if (n->type == AST_LITERAL) {
+        if (n->value) printf("%s", n->value);
+        else if (n->fval != 0.0) printf("%g", n->fval);
+        else printf("%d", n->ival);
+    } else if (n->value) {
+        // Operators stored in value field
+        if (strcmp(n->value, "and") == 0 || strcmp(n->value, "or") == 0) {
+            if (n->left && n->right) {
+                printf("(");
+                print_expr(n->left);
+                printf(" %s ", n->value);
+                print_expr(n->right);
+                printf(")");
+            } else {
+                printf("%s[no-children]", n->value);
+            }
+        } else if (n->left && n->right) {
+            // Binary comparison operator
+            print_expr(n->left);
+            printf("%s", n->value);
+            print_expr(n->right);
+        } else {
+            printf("%s[no-children]", n->value);
+        }
+    } else if (n->name) {
+        // Simple identifier
+        printf("%s", n->name);
+    } else if (n->left && n->right) {
+        // Dotted identifier (qualid) - no name or value, just structure
+        print_expr(n->left);
+        printf(".");
+        print_expr(n->right);
+        if (n->next) {
+            printf(".");
+            print_expr(n->next);
+        }
+    } else {
+        printf("<unknown>");
+    }
+}
+
+void print_ast(AstNode *n, int indent) {
+    print_ast_helper(n, indent, NULL);
 }
 
 void free_ast(AstNode *n) {
@@ -428,30 +617,31 @@ optcond : /* empty */ { $$ = NULL; }
 
 expr : expr AND expr
      { 
-         $$ = make_node(AST_EXPR, "and");
+         $$ = make_node(AST_EXPR, NULL);
+         $$->value = strdup("and");
          $$->left = $1;
          $$->right = $3;
      }
      | expr OR expr
      { 
-         $$ = make_node(AST_EXPR, "or");
+         $$ = make_node(AST_EXPR, NULL);
+         $$->value = strdup("or");
          $$->left = $1;
          $$->right = $3;
      }
      | qualid COP literal
      { 
-         $$ = make_node(AST_EXPR, $2);
+         $$ = make_node(AST_EXPR, NULL);
+         $$->value = $2;  // $2 is already strdup'd from lexer
          $$->left = $1;
          $$->right = $3;
-         free($2);
      }
      | ID COP literal
      { 
-         $$ = make_node(AST_EXPR, $2);
+         $$ = make_node(AST_EXPR, NULL);
+         $$->value = $2;  // $2 is already strdup'd from lexer
          $$->left = make_node(AST_EXPR, $1);
          $$->right = $3;
-         free($1);
-         free($2);
      }
      | '(' expr ')' { $$ = $2; }
      ;
