@@ -37,6 +37,12 @@ vnpu/
 ├── DTECHO.md          # Deep Tree Echo ecosystem integration
 ├── grammar/Vnpu.g4    # ANTLR4 grammar (IDE/tooling)
 ├── src/parser/
+│   ├── ast.h          # AST type definitions and declarations
+│   ├── ast.c          # AST construction, printing, cleanup
+│   ├── sema.h         # Semantic analysis interface
+│   ├── sema.c         # Symbol table + reference validation
+│   ├── codegen.h      # Code generation interface
+│   ├── codegen.c      # C descriptor header emitter
 │   ├── vnpu.l         # Lex tokenizer (Plan9/Inferno)
 │   ├── vnpu.y         # Yacc parser (Plan9/Inferno)
 │   └── Makefile       # Build system
@@ -109,13 +115,23 @@ EvidencePacket ← [outer] ← [trans] ← [inner] ← Results
 
 - [x] ANTLR4 grammar complete (grammar/Vnpu.g4)
 - [x] Lex/Yacc parser scaffolding (src/parser/)
-- [x] AST data structures (implemented in vnpu.y:14-125)
+- [x] AST data structures (ast.h / ast.c)
 - [x] Parser actions for AST construction (all grammar rules build AST)
 - [x] AST pretty-printer for debugging (print_ast function)
-- [ ] Semantic analysis
-- [ ] Code generation
+- [x] Semantic analysis (sema.h / sema.c)
+- [x] Code generation (codegen.h / codegen.c)
 
 ### Recent Changes
+
+**Semantic Analysis + Code Generation (completed)**
+- Extracted AST definitions into `ast.h` / `ast.c` for reuse across modules
+- Implemented `sema.c`: two-pass analysis (collect symbols → validate references)
+  - Checks for duplicate declarations, undefined devices/tensors/kernels/graphs
+- Implemented `codegen.c`: emits `vnpu_out.h` — a self-contained C descriptor
+  header with `static` tables for devices, tensors, kernels, graphs, isolates,
+  and policies; suitable for direct inclusion in a C runtime
+- Updated `main()` in `vnpu.y` to run all three phases: parse → sema → codegen
+- Output file defaults to `vnpu_out.h`; override with `./vnpu_parser out.h < prog.vnpu`
 
 **AST Construction Phase (completed)**
 - Enhanced AST node structure with support for all vNPU constructs
@@ -134,11 +150,14 @@ EvidencePacket ← [outer] ← [trans] ← [inner] ← Results
 cd src/parser && make test
 ```
 
-Output shows structured AST:
+Output shows structured AST, semantic results, and generated file:
 ```
+Parse successful!
+
+=== Abstract Syntax Tree ===
 PROGRAM
   Device 'cpu0' { kind=cpu, threads=4 }
-  Tensor 'x' : f16[1,128,4096] @cpu0
+  ...
   Kernel 'k0' = aten.matmul(x, w) -> y
   Policy 'mem'
     membrane inner denies toolcall
@@ -147,11 +166,16 @@ PROGRAM
   Isolate 'core'
     membrane = inner
     entry g_main
-    ports {
-      port input: Intent
-      port output: Evidence
-    }
+    ports { ... }
+
+=== Semantic Analysis ===
+Semantic analysis: OK (10 symbols)
+
+=== Code Generation ===
+Generated: vnpu_out.h
 ```
+
+The generated `vnpu_out.h` contains static C descriptor tables ready for runtime use.
 
 ### Adding New Language Features
 
