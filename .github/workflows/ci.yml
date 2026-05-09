@@ -1,0 +1,59 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    name: Build & Test (${{ matrix.os }}, ${{ matrix.cc }})
+    runs-on: ${{ matrix.os }}
+
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-22.04, ubuntu-24.04]
+        cc: [gcc, clang]
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y flex bison ${{ matrix.cc }}
+
+      - name: Build parser
+        working-directory: src/parser
+        run: make CC=${{ matrix.cc }} build
+
+      - name: Smoke test (unit test — hello.vnpu)
+        working-directory: src/parser
+        run: make CC=${{ matrix.cc }} test
+
+      - name: Grammar parity check
+        run: bash tests/run_grammar_check.sh
+
+      - name: E2E test suite (fixtures + goldens)
+        run: bash tests/run_e2e.sh src/parser/vnpu_parser
+
+      - name: Validate all examples
+        run: bash tests/validate_examples.sh src/parser/vnpu_parser
+
+      - name: Upload artifacts on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: debug-artifacts-${{ matrix.os }}-${{ matrix.cc }}
+          path: |
+            src/parser/vnpu.tab.c
+            src/parser/lex.yy.c
+            src/parser/vnpu_out.h
+          if-no-files-found: ignore
+          retention-days: 7

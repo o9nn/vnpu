@@ -1,0 +1,28 @@
+name: Grammar Parity Check
+
+on:
+  push:
+    paths:
+      - 'grammar/Vnpu.g4'
+      - 'src/parser/vnpu.l'
+      - 'src/parser/vnpu.y'
+  pull_request:
+    paths:
+      - 'grammar/Vnpu.g4'
+      - 'src/parser/vnpu.l'
+      - 'src/parser/vnpu.y'
+
+permissions:
+  contents: read
+
+jobs:
+  grammar-parity:
+    name: Verify ANTLR ↔ Lex/Yacc parity
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Run grammar parity check
+        run: bash tests/run_grammar_check.sh

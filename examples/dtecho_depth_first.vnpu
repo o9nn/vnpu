@@ -1,0 +1,77 @@
+// vNPU Example: DTEcho — Depth-First Traversal (Phase 3)
+//
+// Intent propagates from the root (outer) through the branch (trans) to the
+// leaf (inner).  Evidence echoes back immediately once the leaf finishes,
+// following a strict depth-first path.
+vnpu v1;
+
+device cpu0 { kind=cpu; threads=8; }
+device gpu0 { kind=cuda; sm=80; }
+
+// State tensors at each depth level
+tensor input_vec      : f32[1,1024] @cpu0;
+tensor output_vec     : f32[1,1024] @cpu0;
+tensor root_state     : f32[1,1024] @gpu0;
+tensor branch_l1      : f32[1,512]  @gpu0;
+tensor branch_l2      : f32[1,256]  @gpu0;
+tensor leaf_state     : f32[1,128]  @gpu0;
+
+// Root ↓ / ↑ kernels
+kernel k_root_down   = dtecho.root_down(input_vec, root_state)    -> branch_l1;
+kernel k_root_up     = dtecho.root_up(branch_l2, root_state)      -> output_vec;
+
+// Branch ↓ / ↑ kernels
+kernel k_branch_down = dtecho.branch_down(branch_l1)              -> branch_l2;
+kernel k_branch_up   = dtecho.branch_up(leaf_state)               -> branch_l2;
+
+// Leaf computation kernel
+kernel k_leaf        = dtecho.leaf_compute(branch_l2)             -> leaf_state;
+
+// Membrane policies for depth-first traversal
+policy dfs_policy {
+  membrane inner denies toolcall;
+  membrane inner denies external_io;
+  membrane trans allows intent when depth <= 16;
+  membrane trans allows evidence when provenance >= 0.5;
+  membrane outer allows intent;
+  membrane outer allows evidence;
+}
+
+// Graphs — one per level
+graph g_leaf   { k_leaf; }
+graph g_branch { k_branch_down; k_branch_up; }
+graph g_root   { k_root_down; k_root_up; }
+
+// Leaf isolate — pure inner computation
+isolate leaf_dfs {
+  membrane=inner;
+  entry g_leaf;
+  ports {
+    task:   Intent;
+    result: Evidence;
+    state:  Tensor;
+  }
+}
+
+// Branch isolate — transitive gateway
+isolate branch_dfs {
+  membrane=trans;
+  entry g_branch;
+  ports {
+    parent_in:  Intent;
+    parent_out: Evidence;
+    child_out:  Intent;
+    child_in:   Evidence;
+  }
+}
+
+// Root isolate — external interface
+isolate root_dfs {
+  membrane=outer;
+  entry g_root;
+  ports {
+    intent:   Intent;
+    evidence: Evidence;
+    control:  Bytes;
+  }
+}
