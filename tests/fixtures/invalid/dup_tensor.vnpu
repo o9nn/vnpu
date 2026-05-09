@@ -1,0 +1,8 @@
+// vNPU Test Fixture (INVALID): duplicate tensor declaration
+// Expected: semantic error "duplicate tensor declaration: 'x'"
+vnpu v1;
+
+device cpu0 { kind=cpu; }
+
+tensor x : f32[4] @cpu0;
+tensor x : f32[8] @cpu0;

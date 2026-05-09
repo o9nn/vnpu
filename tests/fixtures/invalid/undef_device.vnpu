@@ -1,0 +1,5 @@
+// vNPU Test Fixture (INVALID): tensor referencing undefined device
+// Expected: semantic error "undefined device in tensor location: 'missing_device'"
+vnpu v1;
+
+tensor x : f32[4] @missing_device;

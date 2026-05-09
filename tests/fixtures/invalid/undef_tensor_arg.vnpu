@@ -1,0 +1,9 @@
+// vNPU Test Fixture (INVALID): kernel argument referencing undefined tensor
+// Expected: semantic error "undefined tensor argument in kernel: 'ghost'"
+vnpu v1;
+
+device cpu0 { kind=cpu; }
+
+tensor y : f32[4] @cpu0;
+
+kernel k0 = aten.relu(ghost) -> y;

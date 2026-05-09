@@ -1,0 +1,11 @@
+// vNPU Test Fixture (INVALID): duplicate kernel declaration
+// Expected: semantic error "duplicate kernel declaration: 'k0'"
+vnpu v1;
+
+device cpu0 { kind=cpu; }
+
+tensor a : f32[4] @cpu0;
+tensor b : f32[4] @cpu0;
+
+kernel k0 = aten.add(a,b) -> a;
+kernel k0 = aten.mul(a,b) -> b;

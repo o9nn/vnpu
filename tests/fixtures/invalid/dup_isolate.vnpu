@@ -1,0 +1,14 @@
+// vNPU Test Fixture (INVALID): duplicate isolate declaration
+// Expected: semantic error "duplicate isolate declaration: 'iso0'"
+vnpu v1;
+
+device cpu0 { kind=cpu; }
+
+tensor a : f32[4] @cpu0;
+
+kernel k0 = aten.relu(a) -> a;
+
+graph g0 { k0; }
+
+isolate iso0 { membrane=inner; entry g0; }
+isolate iso0 { membrane=outer; entry g0; }
