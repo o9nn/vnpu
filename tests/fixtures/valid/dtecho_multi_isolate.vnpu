@@ -1,0 +1,76 @@
+// vNPU Test Fixture: DTEcho multi-isolate hierarchy
+// Covers: three isolates across all three membrane layers, multiple graphs,
+//         multiple policies, provenance tracking tensor
+vnpu v1;
+
+device cpu0 { kind=cpu; threads=4; }
+device gpu0 { kind=cuda; sm=80; }
+
+// Shared tensors
+tensor intent_in    : f32[1,512]  @cpu0;
+tensor evidence_out : f32[1,512]  @cpu0;
+tensor branch_h     : f32[1,1024] @gpu0;
+tensor leaf_h       : f32[1,256]  @gpu0;
+tensor prov         : f32[1,4]    @cpu0;
+
+// Kernels
+kernel k_enc    = dtecho.encode(intent_in, prov) -> branch_h;
+kernel k_branch = dtecho.branch(branch_h) -> leaf_h;
+kernel k_leaf   = dtecho.leaf(leaf_h) -> leaf_h;
+kernel k_up     = dtecho.echo(leaf_h, prov) -> branch_h;
+kernel k_dec    = dtecho.decode(branch_h) -> evidence_out;
+
+// Policies
+policy leaf_pol {
+  membrane inner denies toolcall;
+  membrane inner denies external_io;
+}
+
+policy branch_pol {
+  membrane trans allows evidence when provenance >= 0.7;
+  membrane trans allows intent when depth <= 10;
+}
+
+policy root_pol {
+  membrane outer allows intent when budget.tokens <= 8192;
+  membrane outer allows evidence when echo.complete == true;
+}
+
+// Graphs
+graph g_leaf   { k_leaf; }
+graph g_branch { k_branch; k_up; }
+graph g_root   { k_enc; k_dec; }
+
+// Isolates
+isolate leaf_iso {
+  membrane=inner;
+  entry g_leaf;
+  ports {
+    task:   Intent;
+    result: Evidence;
+    state:  Tensor;
+  }
+}
+
+isolate branch_iso {
+  membrane=trans;
+  entry g_branch;
+  ports {
+    up_in:   Intent;
+    up_out:  Evidence;
+    dn_out:  Intent;
+    dn_in:   Evidence;
+    control: Bytes;
+  }
+}
+
+isolate root_iso {
+  membrane=outer;
+  entry g_root;
+  ports {
+    intent:   Intent;
+    evidence: Evidence;
+    status:   Tensor;
+    ctrl:     Bytes;
+  }
+}

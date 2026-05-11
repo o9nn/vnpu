@@ -1,0 +1,34 @@
+// vNPU Test Fixture: multiple devices
+// Covers: three device declarations, tensors spread across devices,
+//         parallel kernels, multiple tensor references
+vnpu v1;
+
+device cpu0 { kind=cpu; threads=8; }
+device gpu0 { kind=cuda; sm=80; }
+device gpu1 { kind=cuda; sm=86; }
+
+tensor x   : f16[1,128,4096] @cpu0;
+tensor w0  : f16[4096,4096]  @gpu0;
+tensor w1  : f16[4096,4096]  @gpu1;
+tensor y0  : f16[1,128,4096] @gpu0;
+tensor y1  : f16[1,128,4096] @gpu1;
+
+kernel k0 = aten.matmul(x,w0) -> y0;
+kernel k1 = aten.matmul(x,w1) -> y1;
+
+policy mem {
+  membrane inner denies toolcall;
+  membrane outer allows intent;
+}
+
+graph g_parallel { k0; k1; }
+
+isolate parallel_compute {
+  membrane=inner;
+  entry g_parallel;
+  ports {
+    inp: Tensor;
+    out0: Evidence;
+    out1: Evidence;
+  }
+}

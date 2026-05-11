@@ -3,10 +3,20 @@
  * 
  * A minimal core language for membrane-bound neural substrate (vNPU).
  * Defines: devices, tensors, kernels, graphs, isolates, and policies.
+ *
+ * NOTE: This grammar is the reference specification.  The canonical
+ * implementation is the lex/yacc parser in src/parser/vnpu.l + vnpu.y.
+ * Keep both in sync; run `make grammar-check` from src/parser to verify.
  */
 grammar Vnpu;
 
-program : 'vnpu' VERSION ';' decl* EOF ;
+program : 'vnpu' version ';' decl* EOF ;
+
+/*
+ * Version: the implementation tokenises the version string (e.g. "v1") as a
+ * plain identifier, so we accept any ID here to stay in sync.
+ */
+version : ID ;
 
 decl
   : deviceDecl
@@ -52,18 +62,22 @@ polStmt
 
 membrane : 'inner' | 'trans' | 'outer' ;
 
+/*
+ * Expressions in policy conditions.  qualID is included so that dotted
+ * references such as "budget.tokens" and "echo.complete" are accepted,
+ * matching the lex/yacc implementation.
+ */
 expr
   : expr 'and' expr
   | expr 'or'  expr
-  | ID compOp literal
+  | qualID compOp literal
+  | ID    compOp literal
   | '(' expr ')'
   ;
 
 compOp : '>=' | '<=' | '>' | '<' | '==' | '!=' ;
 
 literal : INT | FLOAT | STRING | BOOL ;
-
-VERSION : 'v' INT ('.' INT)* ;
 
 ID      : [a-zA-Z_][a-zA-Z0-9_]* ;
 INT     : [0-9]+ ;

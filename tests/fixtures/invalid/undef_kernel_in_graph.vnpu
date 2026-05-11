@@ -1,0 +1,9 @@
+// vNPU Test Fixture (INVALID): graph statement referencing undefined kernel
+// Expected: semantic error "undefined kernel referenced in graph: 'no_such_kernel'"
+vnpu v1;
+
+device cpu0 { kind=cpu; }
+
+tensor a : f32[4] @cpu0;
+
+graph g0 { no_such_kernel; }

@@ -1,0 +1,44 @@
+name: Validate Examples
+
+on:
+  push:
+    paths:
+      - 'examples/**'
+      - 'src/parser/**'
+  pull_request:
+    paths:
+      - 'examples/**'
+      - 'src/parser/**'
+
+permissions:
+  contents: read
+
+jobs:
+  validate-examples:
+    name: Compile all examples
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y flex bison gcc
+
+      - name: Build parser
+        working-directory: src/parser
+        run: make build
+
+      - name: Validate all examples
+        run: |
+          VNPU_HEADERS_DIR=/tmp/vnpu-headers bash tests/validate_examples.sh src/parser/vnpu_parser
+
+      - name: Upload generated headers
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-headers
+          path: /tmp/vnpu-headers/
+          if-no-files-found: warn
+          retention-days: 14

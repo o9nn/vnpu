@@ -1,0 +1,18 @@
+// vNPU Test Fixture: symbolic tensor dimensions
+// Covers: identifier-based (symbolic) dimensions like batch, seq, dim
+vnpu v1;
+
+device cpu0 { kind=cpu; }
+
+tensor x : f32[batch,seq,dim] @cpu0;
+tensor w : f32[dim,dim]       @cpu0;
+tensor y : f32[batch,seq,dim] @cpu0;
+
+kernel k0 = aten.matmul(x,w) -> y;
+
+graph g0 { k0; }
+
+isolate iso0 {
+  membrane=inner;
+  entry g0;
+}

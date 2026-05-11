@@ -8,10 +8,22 @@ vNPU (Virtual Neural Processing Unit) is a membrane-bound neural substrate archi
 
 ```bash
 # Build parser
-cd src/parser && make
+cd src/parser && make build
 
-# Test parser with example
+# Smoke test (parse hello.vnpu)
 cd src/parser && make test
+
+# Full end-to-end test suite (all fixtures + golden comparison)
+cd src/parser && make e2e          # or: bash tests/run_e2e.sh src/parser/vnpu_parser
+
+# Grammar parity check (ANTLR ↔ lex/yacc)
+cd src/parser && make grammar-check
+
+# Validate every example compiles
+cd src/parser && make validate-examples
+
+# Regenerate golden files after compiler changes
+cd src/parser && make update-goldens
 
 # Clean build artifacts
 cd src/parser && make clean
@@ -35,7 +47,7 @@ cd src/parser && make clean
 vnpu/
 ├── CLAUDE.md          # This file - AI development guide
 ├── DTECHO.md          # Deep Tree Echo ecosystem integration
-├── grammar/Vnpu.g4    # ANTLR4 grammar (IDE/tooling)
+├── grammar/Vnpu.g4    # ANTLR4 reference grammar (IDE/tooling)
 ├── src/parser/
 │   ├── ast.h          # AST type definitions and declarations
 │   ├── ast.c          # AST construction, printing, cleanup
@@ -45,12 +57,30 @@ vnpu/
 │   ├── codegen.c      # C descriptor header emitter
 │   ├── vnpu.l         # Lex tokenizer (Plan9/Inferno)
 │   ├── vnpu.y         # Yacc parser (Plan9/Inferno)
-│   └── Makefile       # Build system
+│   └── Makefile       # Build system (build/test/e2e/grammar-check/…)
+├── tests/
+│   ├── run_e2e.sh           # Full fixture + golden test runner
+│   ├── run_grammar_check.sh # ANTLR ↔ lex/yacc parity checker
+│   ├── validate_examples.sh # Compile all examples/
+│   ├── update_goldens.sh    # Regenerate golden files
+│   ├── fixtures/
+│   │   ├── valid/           # Programs that must parse + sema-check OK
+│   │   └── invalid/         # Programs that must be rejected
+│   └── goldens/             # Expected compiler output for valid fixtures
 ├── examples/
-│   └── hello.vnpu     # Example program
+│   ├── hello.vnpu           # Canonical hello-world example
+│   ├── dtecho_basic.vnpu    # DTEcho basic echo pattern
+│   ├── dtecho_provenance.vnpu  # DTEcho provenance tracking (Phase 2)
+│   ├── dtecho_depth_first.vnpu # DTEcho depth-first traversal (Phase 3)
+│   └── dtecho_breadth_agg.vnpu # DTEcho breadth aggregation (Phase 3)
+├── .github/workflows/
+│   ├── ci.yml               # Main build+test CI (OS × compiler matrix)
+│   ├── grammar-check.yml    # Grammar parity on grammar/src/parser changes
+│   ├── examples.yml         # Compile all examples on push
+│   └── release.yml          # Build + publish binary on version tags
 ├── docs/
 │   └── vnpu_concepts.md
-└── assets/            # Architecture diagrams
+└── assets/                  # Architecture diagrams
 ```
 
 ## Language Syntax (vNPU IDL)
@@ -120,6 +150,43 @@ EvidencePacket ← [outer] ← [trans] ← [inner] ← Results
 - [x] AST pretty-printer for debugging (print_ast function)
 - [x] Semantic analysis (sema.h / sema.c)
 - [x] Code generation (codegen.h / codegen.c)
+- [x] Correct exit codes (sema failures return non-zero)
+- [x] Basename in generated header comment (portable golden comparison)
+
+### Semantic Analysis Coverage
+
+`sema.c` performs a two-pass analysis:
+
+| Check | Rule |
+|-------|------|
+| Duplicate declarations | All top-level names must be unique per kind |
+| Tensor @device reference | Named device must be declared |
+| Kernel argument tensors | Every ID argument must name a declared tensor |
+| Kernel output tensor | Output ID must name a declared tensor |
+| Graph kernel references | Every graph statement must name a declared kernel |
+| Isolate entry graph | Entry ID must name a declared graph |
+| Isolate `membrane` required | Every isolate must declare a membrane |
+| Isolate `entry` required | Every isolate must declare an entry graph |
+| Port name uniqueness | Port names must be unique within each isolate |
+
+### Test Pyramid
+
+```
+tests/fixtures/valid/        # 9 fixtures — must parse + sema-check (exit 0)
+tests/fixtures/invalid/      # 15 fixtures — must be rejected (exit non-zero)
+tests/goldens/               # Expected compiler output for valid fixtures
+```
+
+Run with `make e2e` (24 tests, all pass by default).
+
+### CI / GitHub Actions
+
+| Workflow | Trigger | What it does |
+|----------|---------|--------------|
+| `ci.yml` | push/PR to main | Build + test on Ubuntu 22.04/24.04 × gcc/clang |
+| `grammar-check.yml` | grammar/parser file changes | ANTLR ↔ lex/yacc parity |
+| `examples.yml` | examples/ or parser changes | Compile all examples; upload headers |
+| `release.yml` | `v*.*.*` tag | Build + publish binary tarball release |
 
 ### Recent Changes
 

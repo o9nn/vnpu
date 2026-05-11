@@ -1,0 +1,12 @@
+// vNPU Test Fixture (INVALID): duplicate graph declaration
+// Expected: semantic error "duplicate graph declaration: 'g0'"
+vnpu v1;
+
+device cpu0 { kind=cpu; }
+
+tensor a : f32[4] @cpu0;
+
+kernel k0 = aten.relu(a) -> a;
+
+graph g0 { k0; }
+graph g0 { k0; }

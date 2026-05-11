@@ -1,0 +1,34 @@
+// vNPU Test Fixture: complex policy expressions
+// Covers: and/or compound conditions, qualified identifiers in conditions,
+//         multiple policy rules per membrane, parenthesised expressions
+vnpu v1;
+
+device cpu0 { kind=cpu; threads=4; }
+
+tensor a : f32[16,16] @cpu0;
+tensor b : f32[16,16] @cpu0;
+
+kernel k0 = aten.add(a,b) -> a;
+kernel k1 = aten.mul(a,b) -> b;
+
+policy pcomplex {
+  membrane inner denies toolcall;
+  membrane inner denies external_io;
+  membrane trans allows evidence when provenance >= 0.8 and budget.tokens <= 2048;
+  membrane trans denies intent when depth > 16;
+  membrane trans allows intent when budget.requests <= 100;
+  membrane outer allows intent when budget.tokens <= 8192;
+  membrane outer allows evidence when echo.complete == true;
+}
+
+graph g0 { k0; k1; }
+
+isolate iso0 {
+  membrane=inner;
+  entry g0;
+  ports {
+    inp: Intent;
+    outp: Evidence;
+    ctrl: Bytes;
+  }
+}

@@ -121,16 +121,48 @@ static void check_graph(AstNode *node) {
 
 static void check_isolate(AstNode *node) {
     /* entry graph must be declared */
+    int has_membrane = 0;
+    int has_entry    = 0;
+
+#define MAX_PORTS 64
+    const char *port_names[MAX_PORTS];
+    int nports = 0;
+
     for (AstNode *prop = node->child; prop; prop = prop->next) {
-        if (prop->type == AST_EXPR &&
-            prop->name && strcmp(prop->name, "entry") == 0) {
+        if (prop->type == AST_MEMBRANE) {
+            has_membrane = 1;
+        } else if (prop->type == AST_EXPR &&
+                   prop->name && strcmp(prop->name, "entry") == 0) {
+            has_entry = 1;
             if (prop->child && prop->child->name) {
                 if (find_sym(prop->child->name, SYM_GRAPH) < 0)
                     sema_error("undefined entry graph in isolate",
                                prop->child->name);
             }
+        } else if (prop->type == AST_LIST) {
+            /* check port name uniqueness within this isolate */
+            for (AstNode *pt = prop->child; pt; pt = pt->next) {
+                if (!pt->name) continue;
+                int dup = 0;
+                for (int i = 0; i < nports; i++) {
+                    if (strcmp(port_names[i], pt->name) == 0) {
+                        dup = 1;
+                        break;
+                    }
+                }
+                if (dup) {
+                    sema_error("duplicate port name in isolate", pt->name);
+                } else if (nports < MAX_PORTS) {
+                    port_names[nports++] = pt->name;
+                }
+            }
         }
     }
+
+    if (!has_membrane)
+        sema_error("isolate missing 'membrane' declaration", node->name);
+    if (!has_entry)
+        sema_error("isolate missing 'entry' declaration", node->name);
 }
 
 static void check_refs(AstNode *node) {

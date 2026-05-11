@@ -1,0 +1,8 @@
+// vNPU Test Fixture (INVALID): isolate entry referencing undefined graph
+// Expected: semantic error "undefined entry graph in isolate: 'no_such_graph'"
+vnpu v1;
+
+isolate iso0 {
+  membrane=inner;
+  entry no_such_graph;
+}

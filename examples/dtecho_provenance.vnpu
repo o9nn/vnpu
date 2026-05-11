@@ -1,0 +1,54 @@
+// vNPU Example: DTEcho — Provenance Tracking (Phase 2)
+//
+// Demonstrates how evidence packets carry provenance metadata through echo
+// layers.  Each kernel touches the provenance tensor so downstream membrane
+// policies can gate on confidence / depth / echo_count.
+vnpu v1;
+
+device cpu0 { kind=cpu; threads=4; }
+device gpu0 { kind=cuda; sm=80; }
+
+// Provenance metadata: [confidence, source_depth, echo_count, timestamp]
+tensor provenance    : f32[1,4]   @cpu0;
+tensor intent_vec    : f32[1,512] @cpu0;
+tensor evidence_vec  : f32[1,512] @cpu0;
+tensor branch_state  : f32[1,1024] @gpu0;
+
+// Initialise provenance from the incoming intent
+kernel k_init_prov  = dtecho.init_provenance(intent_vec) -> provenance;
+// Encode intent into branch hidden state, conditioned on current provenance
+kernel k_encode     = dtecho.encode(intent_vec, provenance) -> branch_state;
+// Process: update state and decay provenance confidence
+kernel k_process    = dtecho.process(branch_state, provenance) -> branch_state;
+kernel k_decay_prov = dtecho.decay_provenance(provenance) -> provenance;
+// Decode back to evidence vector
+kernel k_decode     = dtecho.decode(branch_state, provenance) -> evidence_vec;
+
+// Policy: gate evidence flow on provenance confidence and depth budget
+policy prov_policy {
+  membrane inner denies toolcall;
+  membrane inner denies external_io;
+  membrane trans allows evidence when provenance >= 0.6 and depth <= 12;
+  membrane trans denies evidence when provenance < 0.6;
+  membrane outer allows intent when budget.tokens <= 8192;
+  membrane outer allows evidence when echo.complete == true;
+}
+
+graph g_prov_echo {
+  k_init_prov;
+  k_encode;
+  k_process;
+  k_decay_prov;
+  k_decode;
+}
+
+isolate prov_echo {
+  membrane=trans;
+  entry g_prov_echo;
+  ports {
+    intent_in:   Intent;
+    evidence_out: Evidence;
+    prov_stat:   Tensor;
+    control:     Bytes;
+  }
+}

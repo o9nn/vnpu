@@ -1,0 +1,23 @@
+// vNPU Test Fixture: all supported data types
+// Covers: f16, f32, bf16, i8, i16, i32, i64, u8 tensor declarations
+vnpu v1;
+
+device cpu0 { kind=cpu; }
+
+tensor t_f16  : f16[4,4]  @cpu0;
+tensor t_f32  : f32[4,4]  @cpu0;
+tensor t_bf16 : bf16[4,4] @cpu0;
+tensor t_i8   : i8[4,4]   @cpu0;
+tensor t_i16  : i16[4,4]  @cpu0;
+tensor t_i32  : i32[4,4]  @cpu0;
+tensor t_i64  : i64[4,4]  @cpu0;
+tensor t_u8   : u8[4,4]   @cpu0;
+
+kernel k0 = aten.cast(t_f32) -> t_f16;
+
+graph g0 { k0; }
+
+isolate iso0 {
+  membrane=inner;
+  entry g0;
+}

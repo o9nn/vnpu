@@ -1,0 +1,76 @@
+// vNPU Example: DTEcho — Breadth Aggregation (Phase 3)
+//
+// Multiple leaf isolates compute in parallel.  A coordinator branch
+// aggregates their evidence packets into a single output — the
+// breadth-aggregation echo pattern.
+//
+//   Intent → Branch ─┬→ Leaf₁ → Evidence₁ ─┐
+//                    ├→ Leaf₂ → Evidence₂ ──┼→ Branch → Evidence
+//                    └→ Leaf₃ → Evidence₃ ─┘
+vnpu v1;
+
+device cpu0 { kind=cpu; threads=16; }
+device gpu0 { kind=cuda; sm=86; }
+
+// Shared input / output
+tensor intent_vec   : f32[1,512]  @cpu0;
+tensor evidence_vec : f32[1,512]  @cpu0;
+
+// Per-leaf hidden states (computed in parallel)
+tensor leaf1_state : f32[1,256] @gpu0;
+tensor leaf2_state : f32[1,256] @gpu0;
+tensor leaf3_state : f32[1,256] @gpu0;
+
+// Aggregated state (breadth merge)
+tensor agg_state   : f32[1,768] @gpu0;
+
+// Leaf computation kernels (same op, different outputs)
+kernel k_leaf1 = dtecho.leaf_compute(intent_vec) -> leaf1_state;
+kernel k_leaf2 = dtecho.leaf_compute(intent_vec) -> leaf2_state;
+kernel k_leaf3 = dtecho.leaf_compute(intent_vec) -> leaf3_state;
+
+// Aggregation and decode
+kernel k_agg    = dtecho.aggregate(leaf1_state, leaf2_state, leaf3_state) -> agg_state;
+kernel k_decode = dtecho.decode(agg_state) -> evidence_vec;
+
+// Branch coordinator policy
+policy breadth_policy {
+  membrane inner denies toolcall;
+  membrane trans allows evidence when provenance >= 0.7;
+  membrane outer allows intent when budget.tokens <= 4096;
+  membrane outer allows evidence when echo.complete == true;
+}
+
+// Leaf graph — all three leaves in one graph (parallel by convention)
+graph g_leaves {
+  k_leaf1;
+  k_leaf2;
+  k_leaf3;
+}
+
+// Aggregation graph
+graph g_aggregate {
+  k_agg;
+  k_decode;
+}
+
+// Leaf isolate (inner — pure computation)
+isolate leaves {
+  membrane=inner;
+  entry g_leaves;
+  ports {
+    task:   Intent;
+    result: Evidence;
+  }
+}
+
+// Coordinator isolate (trans — aggregates leaf evidence)
+isolate coordinator {
+  membrane=trans;
+  entry g_aggregate;
+  ports {
+    intent:   Intent;
+    evidence: Evidence;
+    status:   Tensor;
+  }
+}

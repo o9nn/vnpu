@@ -175,15 +175,15 @@ EvidencePacket {
 - [x] Membrane isolation model
 - [x] Basic packet types
 
-### Phase 2: Echo Infrastructure (Current)
-- [ ] Branch node isolate template
-- [ ] Echo coordinator implementation
-- [ ] Provenance tracking in packets
+### Phase 2: Echo Infrastructure ✓
+- [x] Branch node isolate template (`examples/dtecho_basic.vnpu`)
+- [x] Echo coordinator implementation (`examples/dtecho_basic.vnpu`)
+- [x] Provenance tracking in packets (`examples/dtecho_provenance.vnpu`)
 
-### Phase 3: Tree Operations
-- [ ] Depth-first traversal kernels
-- [ ] Breadth aggregation operators
-- [ ] Dynamic branch spawning
+### Phase 3: Tree Operations ✓
+- [x] Depth-first traversal kernels (`examples/dtecho_depth_first.vnpu`)
+- [x] Breadth aggregation operators (`examples/dtecho_breadth_agg.vnpu`)
+- [ ] Dynamic branch spawning (runtime concern — not expressible in IDL)
 
 ### Phase 4: Advanced Patterns
 - [ ] Recursive echo optimization

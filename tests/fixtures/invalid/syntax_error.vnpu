@@ -1,0 +1,5 @@
+// vNPU Test Fixture (INVALID): syntax error — device missing name
+// Expected: parse error
+vnpu v1;
+
+device { kind=cpu; }

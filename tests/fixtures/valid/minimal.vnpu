@@ -1,0 +1,16 @@
+// vNPU Test Fixture: minimal valid program
+// Covers: device, tensor, kernel, graph, isolate (no ports, no policy)
+vnpu v1;
+
+device cpu0 { kind=cpu; }
+
+tensor x : f32[1,64] @cpu0;
+
+kernel k0 = aten.add(x,x) -> x;
+
+graph g_main { k0; }
+
+isolate core {
+  membrane=inner;
+  entry g_main;
+}

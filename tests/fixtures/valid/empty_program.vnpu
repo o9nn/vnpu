@@ -1,0 +1,3 @@
+// vNPU Test Fixture: empty program (no declarations)
+// Covers: minimum syntactically valid program (version + EOF)
+vnpu v1;

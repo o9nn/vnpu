@@ -1,0 +1,68 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Build & publish release
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y flex bison gcc
+
+      - name: Build parser
+        working-directory: src/parser
+        run: make build
+
+      - name: Run smoke test
+        working-directory: src/parser
+        run: make test
+
+      - name: Run grammar parity check
+        run: bash tests/run_grammar_check.sh
+
+      - name: Run E2E test suite
+        run: bash tests/run_e2e.sh src/parser/vnpu_parser
+
+      - name: Validate all examples
+        run: |
+          VNPU_HEADERS_DIR=/tmp/vnpu-headers bash tests/validate_examples.sh src/parser/vnpu_parser
+
+      - name: Package release artifacts
+        run: |
+          VERSION="${GITHUB_REF_NAME}"
+          ARCHIVE="vnpu-${VERSION}-linux-x86_64.tar.gz"
+          mkdir -p release/vnpu-${VERSION}
+          cp src/parser/vnpu_parser release/vnpu-${VERSION}/
+          cp -r examples            release/vnpu-${VERSION}/
+          cp -r grammar             release/vnpu-${VERSION}/
+          cp README.md CLAUDE.md    release/vnpu-${VERSION}/
+          tar -czf "${ARCHIVE}" -C release "vnpu-${VERSION}"
+          echo "ARCHIVE=${ARCHIVE}" >> "$GITHUB_ENV"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "vNPU $GITHUB_REF_NAME" \
+            --notes "## vNPU $GITHUB_REF_NAME
+
+          Includes:
+          - \`vnpu_parser\` — compiled binary (linux/x86_64)
+          - \`examples/\`   — example vNPU programs
+          - \`grammar/\`    — ANTLR4 reference grammar
+          " \
+            "$ARCHIVE"

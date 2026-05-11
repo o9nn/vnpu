@@ -1,0 +1,6 @@
+// vNPU Test Fixture (INVALID): duplicate policy declaration
+// Expected: semantic error "duplicate policy declaration: 'mem'"
+vnpu v1;
+
+policy mem { membrane inner denies toolcall; }
+policy mem { membrane outer allows intent; }

@@ -1,0 +1,6 @@
+// vNPU Test Fixture (INVALID): duplicate device declaration
+// Expected: semantic error "duplicate device declaration: 'cpu0'"
+vnpu v1;
+
+device cpu0 { kind=cpu; }
+device cpu0 { kind=cuda; }

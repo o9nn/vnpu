@@ -366,11 +366,14 @@ int main(int argc, char **argv) {
         print_ast(ast_root, 0);
 
         printf("\n=== Semantic Analysis ===\n");
-        if (sema_check(ast_root) == 0) {
+        int sema_errors = sema_check(ast_root);
+        if (sema_errors == 0) {
             printf("\n=== Code Generation ===\n");
             const char *outfile = (argc > 1) ? argv[1] : "vnpu_out.h";
             codegen_emit(ast_root, outfile);
             printf("Generated: %s\n", outfile);
+        } else {
+            result = sema_errors;
         }
 
         free_ast(ast_root);
